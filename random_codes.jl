@@ -1,35 +1,54 @@
-# inputs: n - number of neurons, d-dimension, a-side length of box
-# b- max radius
-# output: (centers, radii). centers is a list of n random points chose uniformly at random (I hope...) from a cube in R^d with side length a. radii is a list of n random numbers between 0 and b.
-#you should think of this output as specifying n random balls in a d-dimensional box. and you should think of the balls as place fields.
-function random_cover(n, d, a, b)
-    centers = a * rand(n, d)
-    radii =  b * rand(n)
+"""
+    random_cover(n, d, max_rad, sides)
+
+Generate n circles with random radii between 0 and max_rad and random
+centers chosen in a d dimensional box of with side length "sides".
+
+"""
+
+function random_cover(n, d, max_rad, sides)
+    centers = sides * rand(n, d)
+    radii =  max_rad * rand(n)
     return (centers, radii)
 end
 
 
-#given two points in R^k, returns the distance between them
-#inputs: two lists or tuples or numbers
+"""
+    distance(x,y)
+
+Gives the Euclidean distance between x and y.
+
+# Examples
+
+```jldoctest
+julia> distance([0,1], [1,0])
+1.41...
+```
+"""
+
 function distance(x, y)
     diffs_squared = [(x[i]-y[i])^2 for i in 1:length(x)]
     return sqrt(sum_kbn(diffs_squared))
 end
 
-#= makes a random n neuron code whose place fields are filled
-circles with radius 0 to b whose centers are in an a by a box =#
-#= input: n-number of neurons, an integer
-          a-box size, an integer
-          b-max radius size, doesn't need to be an int =#
 
-function rand_2d_circle_code(n, a, b)
-    coords = [(x, y) for x in -b:a+b, y in -b:a+b]
-    (centers, radii) = random_cover(n, 2, a, b)
+"""
+    rand_2d_circle_code(n, max_rad, sides)
+
+Generates n random circles of radius less than r and centers in a s by s square, and returns both the data of the cover and the code of a cover. For some reason, this is faster than using cover_to_code on the output of random_cover.
+
+Our convention is to omit the empty codeword.
+
+"""
+
+function rand_2d_circle_code(n, max_rad, sides)
+    coords = [(x, y) for x in -max_rad:sides+max_rad, y in -max_rad:sides+max_rad]
+    (centers, radii) = random_cover(n, 2, max_rad, sides)
     codewords = []
     for (x, y) in coords
         codeword = []
         for i in 1:n
-            if distance(centers[i], [x, y]) < radii[i]
+            if distance([centers[i,1], centers[i,2]], [x, y]) < radii[i]
                 push!(codeword, i)
             end
         end
@@ -37,22 +56,24 @@ function rand_2d_circle_code(n, a, b)
             push!(codewords, codeword)
         end
     end
-    return codewords
+    return ((centers, radii), codewords)
 end
 
-#= given a cover, a number giving the box size of the code, give the code of the
-cover =#
-#=inputs: centers--a list of n d-tuples, where n is the number of neuons and
-d is the dimension, giving the centers of the place fields
-           radiii - a n-tuple of numbers, giving the radii of the place fields
-           a - an integer, the box size =#
-#=output: a list of codewords, given as subsets of [n]=#
+"""
+    cover_to_code(centers, radii, sides)
 
-function cover_to_code(centers, radii, a)
+Given the data of a cover of circles given as lists of centers and radii,
+and a number sides giving the sidelength of a box containing the centers of the
+circles, this computes the code of the cover. This is slower than
+rand_2d_circle_code for n=2, and too slow to be practical for n>2.
+
+Our convention is to omit the empty codeword.
+"""
+
+function cover_to_code(centers, radii, sides)
     n = size(radii)[1]
     b = maximum(radii)
-    dims = tuple(fill( ceil(Int, a + 2*b), n )...)
-    print(dims)
+    dims = tuple(fill( ceil(Int, sides + 2*b), n )...)
     codewords = []
     for index in CartesianRange(dims) #need to make dims a tuple, somehow
         point = [(index.I[i])-b for i = 1:n]
@@ -69,11 +90,12 @@ function cover_to_code(centers, radii, a)
     return codewords
 end
 
-#=convert codeword in support form to codeword in vector form=#
-#=input: codeword--a list of integers
-         n--the number of neurons the codeword is on =#
-#=output: a n entry list with a 1 at the ith entry if i\in codeword and a 0
-at the nth entry otherwise =#
+"""
+    support_to_vector(codeword, n)
+
+Given a codeword on n neurons presented as a list of integers between 1 and n,
+returns a codeword on n neurons presented as binary vector of length n.
+"""
 function support_to_vector(codeword,n)
     vector = fill(0, n)
     for i in codeword
@@ -82,10 +104,13 @@ function support_to_vector(codeword,n)
     return vector
 end
 
-#converts a neural code from support form to vector form
-#=imputs: code -- a list of lists, each containing a subset of 1:n
-          n -- an integer =#
-#=outputs: a list of lists of length n, each containing 0's and 1's =#
+"""
+    supports_to_vectors(code, n)
+
+Given a neural code presented as a list of codewords, each presented as a list
+of integers between 1 and n, returns the neural code as a list of binary vectors
+of length n.
+"""
 function supports_to_vectors(code, n)
     return [support_to_vector(codeword, n) for codeword in code]
 end
